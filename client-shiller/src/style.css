@@ -1,0 +1,23 @@
+:root {
+  font-family: "Roboto Condensed", "Segoe UI", Arial, sans-serif;
+  color-scheme: dark;
+  background-color: #0a0d14;
+  color: #f8fafc;
+}
+
+body {
+  margin: 0;
+  background: #0a0d14;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+* {
+  box-sizing: border-box;
+}
