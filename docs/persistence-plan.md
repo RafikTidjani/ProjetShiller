@@ -1,6 +1,6 @@
 # Persistance Projet Shiller (PostgreSQL)
 
-Objectif : remplacer le stockage en mémoire par une base PostgreSQL et structurer les données pour préparer l'évolution (historique, multi-formateur, audit). Cette note décrit la stratégie pour l'intégration progressive.
+Objectif : remplacer le stockage en mémoire par une base PostgreSQL et structurer les données pour préparer l'évolution (historique, multi-formateur, audit). Cette note décrit la stratégie adoptée. ✅ Migration initiale et refactor backend réalisés (sessions/événements en base).
 
 ## 1. Choix techniques
 - **Base** : PostgreSQL 15+ (compatible avec services cloud et Docker). 

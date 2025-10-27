@@ -177,14 +177,16 @@ watch(
 
 <style scoped>
 .monitor-shell {
-  width: min(1150px, 96vw);
+  width: 1600px;
+  max-width: 98vw;
+  min-height: min(900px, 92vh);
   background: linear-gradient(145deg, #1a1f2d 0%, #0d111b 100%);
-  border-radius: 32px;
-  border: 5px solid #2d384f;
-  padding: 1.4rem 1.6rem;
+  border-radius: 36px;
+  border: 6px solid #2d384f;
+  padding: 2.4rem 2.6rem;
   display: grid;
-  gap: 0.9rem;
-  box-shadow: inset 0 0 40px rgba(8, 10, 20, 0.65), 0 45px 120px rgba(5, 7, 12, 0.7);
+  gap: 1.2rem;
+  box-shadow: inset 0 0 40px rgba(8, 10, 20, 0.65), 0 55px 140px rgba(5, 7, 12, 0.7);
 }
 
 .monitor-top {
@@ -277,9 +279,9 @@ watch(
 
 .monitor-grid {
   display: grid;
-  grid-template-columns: 1.4fr 0.9fr;
-  grid-template-rows: 1.4fr 1fr;
-  gap: 0.8rem;
+  grid-template-columns: 1.6fr 1fr;
+  grid-template-rows: 1.55fr 1.1fr;
+  gap: 1.2rem;
 }
 
 .tile {
@@ -320,15 +322,15 @@ watch(
 }
 
 .tile__value--xl {
-  font-size: clamp(4.5rem, 8vw, 6rem);
+  font-size: clamp(4.8rem, 8vw, 6.8rem);
 }
 
 .tile__value--lg {
-  font-size: clamp(3.8rem, 7vw, 5.2rem);
+  font-size: clamp(4.2rem, 7.5vw, 5.8rem);
 }
 
 .tile__value--md {
-  font-size: clamp(2.6rem, 4vw, 3.5rem);
+  font-size: clamp(3rem, 4.5vw, 3.8rem);
 }
 
 .tile__icon {
@@ -430,7 +432,7 @@ watch(
 }
 
 .bp-col strong {
-  font-size: clamp(2.7rem, 5vw, 3.5rem);
+  font-size: clamp(3rem, 5.5vw, 3.9rem);
   font-weight: 600;
 }
 
@@ -452,14 +454,64 @@ watch(
   color: rgba(226, 232, 240, 0.6);
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 1400px) {
+  .monitor-shell {
+    width: 95vw;
+    min-height: min(820px, 92vh);
+    padding: 2rem 2.2rem;
+    border-width: 5px;
+  }
+
+  .monitor-grid {
+    grid-template-columns: 1.5fr 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 1080px) {
   .monitor-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(4, auto);
+    grid-template-rows: repeat(4, minmax(220px, auto));
   }
 
   .tile--bp {
     grid-row: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .monitor-shell {
+    padding: 1.4rem 1.5rem;
+    border-radius: 28px;
+    border-width: 4px;
+    min-height: auto;
+  }
+
+  .monitor-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.7rem;
+  }
+
+  .monitor-meta {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .monitor-grid {
+    gap: 0.8rem;
+  }
+
+  .tile__value--xl {
+    font-size: clamp(3.6rem, 12vw, 4.8rem);
+  }
+
+  .tile__value--lg {
+    font-size: clamp(3.2rem, 10vw, 4.2rem);
+  }
+
+  .tile__value--md {
+    font-size: clamp(2.4rem, 8vw, 3.2rem);
   }
 }
 </style>
