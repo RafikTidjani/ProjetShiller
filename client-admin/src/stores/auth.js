@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import router from "../router";
 
 const STORAGE_KEY = "shiller-trainer-admin";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 const loadPersisted = () => {
   try {
@@ -46,7 +47,7 @@ export const useAuthStore = defineStore("auth", {
       this.loading = true;
       this.error = null;
       try {
-        const response = await fetch("http://localhost:4000/api/auth/login", {
+        const response = await fetch(`${API_BASE}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
