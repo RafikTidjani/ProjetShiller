@@ -1,13 +1,28 @@
-app = "shiller-server"
+# fly.toml app configuration file generated for shiller-server on 2025-10-29T16:05:59+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'shiller-server'
+primary_region = 'cdg'
+
 [build]
-dockerfile = "Dockerfile"
-[env]
-PORT = "4000"
-[http_service]
-internal_port = 4000
-force_https = true
-auto_start_machines = true
-auto_stop_machines = true
-min_machines_running = 0
+  dockerfile = 'Dockerfile'
+
 [deploy]
-release_command = "npm run migrate:up"
+  release_command = 'npm run migrate:up'
+
+[env]
+  PORT = '4000'
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
