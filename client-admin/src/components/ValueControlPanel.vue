@@ -77,6 +77,12 @@
             {{ formatStep(step) }} DIA
           </button>
         </div>
+        <div class="controls">
+          <button @click="applyBpPreset(120,80)">Preset 120/80</button>
+          <button @click="applyBpPreset(90,60)">Preset 90/60</button>
+          <button @click="applyBpPreset(160,100)">Preset 160/100</button>
+          <button @click="applyBpPreset(70,40)">Preset 70/40</button>
+        </div>
       </article>
 
       <article class="card" :class="rangeClass('heartRate')">
@@ -366,12 +372,18 @@ const onInput = (field, value) => {
   scheduleSend();
 };
 
-const formatStep = (step) => (step > 0 ? `+${step}` : `${step}`);
+  const formatStep = (step) => (step > 0 ? `+${step}` : `${step}`);
 
-const rangeClass = (...fields) => {
-  const hasWarning = fields.some((field) => outOfRange[field]);
-  return hasWarning ? "alert" : "";
-};
+  const rangeClass = (...fields) => {
+    const hasWarning = fields.some((field) => outOfRange[field]);
+    return hasWarning ? "alert" : "";
+  };
+
+  const applyBpPreset = (sys, dia) => {
+    localValues.systolic = sys;
+    localValues.diastolic = dia;
+    forceSend();
+  };
 
 const formatDate = (iso) =>
   new Intl.DateTimeFormat("fr-FR", {
