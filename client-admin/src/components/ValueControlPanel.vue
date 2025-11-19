@@ -1,5 +1,5 @@
 <template>
-<section class="control-panel" v-if="session">
+  <section class="control-panel" v-if="session">
     <header>
       <div>
         <h3>Contrôle en temps réel</h3>
@@ -10,7 +10,10 @@
       </div>
       <div class="status">
         <span :class="['indicator', socketConnected ? 'online' : 'offline']"></span>
-        <span>{{ socketConnected ? "Connecté" : "Déconnecté" }}</span>
+        <span>{{ socketConnected ? 'Connecté' : 'Déconnecté' }}</span>
+        <button type="button" class="sensor-btn" @click="toggleSensors">
+          Capteurs Pouls/Sat : {{ sensorsOn ? 'ON' : 'OFF' }}
+        </button>
       </div>
     </header>
 
@@ -24,20 +27,11 @@
           maxlength="80"
           placeholder="Prénom ou surnom"
         />
-        <button
-          type="submit"
-          class="save"
-          :disabled="nameSaving || !hasNameChanged"
-        >
+        <button type="submit" class="save" :disabled="nameSaving || !hasNameChanged">
           <span v-if="nameSaving">Sauvegarde…</span>
           <span v-else>Enregistrer</span>
         </button>
-        <button
-          v-if="hasNameChanged && !nameSaving"
-          type="button"
-          class="ghost"
-          @click="resetName"
-        >
+        <button v-if="hasNameChanged && !nameSaving" type="button" class="ghost" @click="resetName">
           Annuler
         </button>
       </div>
@@ -45,24 +39,17 @@
     </form>
 
     <div class="cards">
+      <!-- Tension -->
       <article class="card" :class="rangeClass('systolic', 'diastolic')">
         <h4>Tension artérielle</h4>
         <div class="values-row">
           <div class="value-block">
             <span>SYS</span>
-            <input
-              type="number"
-              :value="localValues.systolic"
-              @input="onInput('systolic', $event.target.value)"
-            />
+            <input type="number" :value="localValues.systolic" @input="onInput('systolic', $event.target.value)" />
           </div>
           <div class="value-block">
             <span>DIA</span>
-            <input
-              type="number"
-              :value="localValues.diastolic"
-              @input="onInput('diastolic', $event.target.value)"
-            />
+            <input type="number" :value="localValues.diastolic" @input="onInput('diastolic', $event.target.value)" />
           </div>
           <div class="value-block map">
             <span>MAP (calc.)</span>
@@ -78,23 +65,20 @@
           </button>
         </div>
         <div class="controls">
-          <button @click="applyBpPreset(120,80)">Preset 120/80</button>
-          <button @click="applyBpPreset(90,60)">Preset 90/60</button>
-          <button @click="applyBpPreset(160,100)">Preset 160/100</button>
-          <button @click="applyBpPreset(70,40)">Preset 70/40</button>
+          <button @click="applyBpPreset(120, 80)">Preset 120/80</button>
+          <button @click="applyBpPreset(90, 60)">Preset 90/60</button>
+          <button @click="applyBpPreset(160, 100)">Preset 160/100</button>
+          <button @click="applyBpPreset(70, 40)">Preset 70/40</button>
         </div>
       </article>
 
+      <!-- Pouls -->
       <article class="card" :class="rangeClass('heartRate')">
         <h4>Fréquence cardiaque</h4>
         <div class="values-row">
           <div class="value-block">
             <span>BPM</span>
-            <input
-              type="number"
-              :value="localValues.heartRate"
-              @input="onInput('heartRate', $event.target.value)"
-            />
+            <input type="number" :value="localValues.heartRate" @input="onInput('heartRate', $event.target.value)" />
           </div>
         </div>
         <div class="controls">
@@ -104,20 +88,17 @@
         </div>
       </article>
 
+      <!-- Sat -->
       <article class="card" :class="rangeClass('spo2')">
         <h4>Saturation SpO₂</h4>
         <div class="values-row">
           <div class="value-block">
             <span>%</span>
-            <input
-              type="number"
-              :value="localValues.spo2"
-              @input="onInput('spo2', $event.target.value)"
-            />
+            <input type="number" :value="localValues.spo2" @input="onInput('spo2', $event.target.value)" />
           </div>
         </div>
         <div class="controls">
-          <button v-for="step in [ -5, -1, +1, +5 ]" :key="'spo-' + step" @click="adjust('spo2', step)">
+          <button v-for="step in steps" :key="'spo-' + step" @click="adjust('spo2', step)">
             {{ formatStep(step) }}
           </button>
         </div>
@@ -128,7 +109,7 @@
       <div class="messages">
         <p v-if="statusMessage" :class="statusType">{{ statusMessage }}</p>
         <p v-if="hasOutOfRange" class="warning">
-          ⚠️ Valeurs hors plage réaliste : ajustez ou assumez pour l’exercice.
+          Valeurs hors plage réaliste : ajustez ou assumez pour l’exercice.
         </p>
       </div>
       <button class="secondary" type="button" :disabled="saving" @click="forceSend">
@@ -140,256 +121,270 @@
 </template>
 
 <script setup>
-import { io } from "socket.io-client";
-import {
-  computed,
-  onMounted,
-  onUnmounted,
-  reactive,
-  ref,
-  watch,
-} from "vue";
-import { useAuthStore } from "../stores/auth";
-import { useSessionsStore } from "../stores/sessions";
+import { io } from 'socket.io-client'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { useSessionsStore } from '../stores/sessions'
+
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
 
 const props = defineProps({
   session: {
     type: Object,
-    required: true,
-  },
-});
+    required: true
+  }
+})
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-const authStore = useAuthStore();
-const sessionsStore = useSessionsStore();
+const authStore = useAuthStore()
+const sessionsStore = useSessionsStore()
 
 const localValues = reactive({
   systolic: props.session.lastValues?.systolic ?? 120,
   diastolic: props.session.lastValues?.diastolic ?? 80,
   heartRate: props.session.lastValues?.heartRate ?? 70,
-  spo2: props.session.lastValues?.spo2 ?? 98,
-});
+  spo2: props.session.lastValues?.spo2 ?? 98
+})
 
 const outOfRange = reactive({
   systolic: false,
   diastolic: false,
   heartRate: false,
-  spo2: false,
-});
+  spo2: false
+})
 
-const steps = [-5, -1, +1, +5];
-const statusMessage = ref("");
-const statusType = ref("info");
-const saving = ref(false);
-const socketConnected = ref(false);
-const traineeDraft = ref(props.session.traineeName ?? "");
-const nameSaving = ref(false);
-const nameFeedback = ref("");
-const hasNameChanged = computed(
-  () => traineeDraft.value.trim() !== (props.session.traineeName ?? ""),
-);
-let socket;
-let debounceTimer = null;
+const steps = [-5, -1, +1, +5]
+
+const statusMessage = ref('')
+const statusType = ref('info')
+const saving = ref(false)
+
+const socketConnected = ref(false)
+let socket
+
+// apprenant
+const traineeDraft = ref(props.session.traineeName ?? '')
+const nameSaving = ref(false)
+const nameFeedback = ref('')
+const hasNameChanged = computed(() => traineeDraft.value !== (props.session.traineeName ?? ''))
+
+// capteurs
+const sensorsOn = computed(() => props.session.lastValues?.sensorsOn !== false)
 
 const meanArterialPressure = computed(() => {
-  const { systolic, diastolic } = localValues;
-  return Math.round((diastolic * 2 + systolic) / 3);
-});
+  const { systolic, diastolic } = localValues
+  return Math.round((diastolic * 2 + systolic) / 3)
+})
 
-const hasOutOfRange = computed(() =>
-  Object.values(outOfRange).some((value) => value),
-);
+const hasOutOfRange = computed(
+  () => outOfRange.systolic || outOfRange.diastolic || outOfRange.heartRate || outOfRange.spo2
+)
 
-const setValues = (values) => {
-  localValues.systolic = Math.round(values.systolic);
-  localValues.diastolic = Math.round(values.diastolic);
-  localValues.heartRate = Math.round(values.heartRate);
-  localValues.spo2 = Math.round(values.spo2);
-};
-
-const setOutOfRange = (ranges) => {
-  if (!ranges) return;
-  Object.assign(outOfRange, ranges);
-};
-
-const connectSocket = () => {
-  disconnectSocket();
-  socket = io(API_BASE, {
-    transports: ["websocket"],
-  });
-
-  socket.on("connect", () => {
-    socketConnected.value = true;
-    socket.emit("join-session", { sessionCode: props.session.code });
-  });
-
-  socket.on("disconnect", () => {
-    socketConnected.value = false;
-  });
-
-  socket.on("session-values", (payload) => {
-    if (payload.sessionId !== props.session.id) return;
-    setValues(payload);
-    setOutOfRange(payload.outOfRange);
+function connectSocket () {
+  disconnectSocket()
+  socket = io(API_BASE, { transports: ['websocket'] })
+  socket.on('connect', () => {
+    socketConnected.value = true
+    socket.emit('join-session', { sessionCode: props.session.code })
+  })
+  socket.on('disconnect', () => {
+    socketConnected.value = false
+  })
+  socket.on('session-values', payload => {
+    if (payload.sessionId !== props.session.id) return
+    const values = {
+      systolic: payload.systolic ?? localValues.systolic,
+      diastolic: payload.diastolic ?? localValues.diastolic,
+      heartRate: payload.heartRate ?? localValues.heartRate,
+      spo2: payload.spo2 ?? localValues.spo2,
+      sensorsOn: payload.sensorsOn ?? sensorsOn.value
+    }
+    Object.assign(localValues, {
+      systolic: values.systolic,
+      diastolic: values.diastolic,
+      heartRate: values.heartRate,
+      spo2: values.spo2
+    })
     sessionsStore.updateSessionValues(
       props.session.id,
       {
-        systolic: payload.systolic,
-        diastolic: payload.diastolic,
-        heartRate: payload.heartRate,
-        spo2: payload.spo2,
+        systolic: values.systolic,
+        diastolic: values.diastolic,
+        heartRate: values.heartRate,
+        spo2: values.spo2,
+        sensorsOn: values.sensorsOn
       },
-      payload.timestamp,
-    );
-  });
+      payload.timestamp || new Date().toISOString()
+    )
+  })
+}
 
-  socket.on("session-expired", (payload) => {
-    if (payload.sessionId && payload.sessionId !== props.session.id) return;
-    statusMessage.value = "Session expirée.";
-    statusType.value = "warning";
-    sessionsStore.markSessionClosed(props.session.id, payload.reason);
-  });
-};
-
-const disconnectSocket = () => {
+function disconnectSocket () {
   if (socket) {
-    socket.disconnect();
-    socket = null;
+    socket.disconnect()
+    socket = null
   }
-};
+}
 
-onUnmounted(disconnectSocket);
+onMounted(connectSocket)
+onUnmounted(disconnectSocket)
 
 watch(
   () => props.session.id,
   () => {
-    setValues(props.session.lastValues ?? {});
-    traineeDraft.value = props.session.traineeName ?? "";
-    nameFeedback.value = "";
-    connectSocket();
-  },
-  { immediate: true },
-);
-
-watch(
-  () => props.session.lastValues,
-  (values) => {
-    if (!values) return;
-    setValues(values);
-  },
-  { deep: true },
-);
-
-watch(
-  () => props.session.traineeName,
-  (value) => {
-    traineeDraft.value = value ?? "";
-  },
-);
-
-const resetName = () => {
-  traineeDraft.value = props.session.traineeName ?? "";
-  nameFeedback.value = "";
-};
-
-const saveTraineeName = async () => {
-  if (!hasNameChanged.value) return;
-  nameSaving.value = true;
-  nameFeedback.value = "";
-  try {
-    const updated = await sessionsStore.updateTraineeName(
-      props.session.id,
-      traineeDraft.value.trim(),
-    );
-    nameFeedback.value = updated.traineeName
-      ? "Prénom mis à jour."
-      : "Prénom effacé.";
-  } catch (err) {
-    nameFeedback.value = err.message;
-    traineeDraft.value = props.session.traineeName ?? "";
-  } finally {
-    nameSaving.value = false;
+    Object.assign(localValues, {
+      systolic: props.session.lastValues?.systolic ?? 120,
+      diastolic: props.session.lastValues?.diastolic ?? 80,
+      heartRate: props.session.lastValues?.heartRate ?? 70,
+      spo2: props.session.lastValues?.spo2 ?? 98
+    })
+    traineeDraft.value = props.session.traineeName ?? ''
+    connectSocket()
   }
-};
+)
 
-const scheduleSend = () => {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    forceSend();
-  }, 120);
-};
-
-const payloadForSend = () => ({
-  systolic: Number(localValues.systolic),
-  diastolic: Number(localValues.diastolic),
-  heartRate: Number(localValues.heartRate),
-  spo2: Number(localValues.spo2),
-});
-
-const forceSend = async () => {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
+const scheduleSend = (() => {
+  let timer = null
+  return () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      forceSend()
+      timer = null
+    }, 150)
   }
-  saving.value = true;
-  statusMessage.value = "";
+})()
+
+function forceSend () {
+  saving.value = true
+  statusMessage.value = ''
+  const payload = {
+    systolic: Number(localValues.systolic),
+    diastolic: Number(localValues.diastolic),
+    heartRate: Number(localValues.heartRate),
+    spo2: Number(localValues.spo2)
+  }
+  fetch(`${API_BASE}/api/sessions/${props.session.id}/values`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authStore.authHeader
+    },
+    body: JSON.stringify(payload)
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Erreur lors de la transmission')
+      }
+      statusMessage.value = 'Valeurs transmises'
+      statusType.value = 'success'
+    })
+    .catch(err => {
+      statusMessage.value = err.message
+      statusType.value = 'error'
+    })
+    .finally(() => {
+      saving.value = false
+    })
+}
+
+function adjust (field, step) {
+  const current = Number(localValues[field])
+  localValues[field] = Number.isNaN(current) ? step : current + step
+  scheduleSend()
+}
+
+function onInput (field, value) {
+  const n = Number(value)
+  if (Number.isNaN(n)) return
+  localValues[field] = n
+  scheduleSend()
+}
+
+const formatStep = step => (step > 0 ? `+${step}` : `${step}`)
+
+function rangeClass (...fields) {
+  const hasWarning = fields.some(field => outOfRange[field])
+  return hasWarning ? 'alert' : ''
+}
+
+function applyBpPreset (sys, dia) {
+  localValues.systolic = sys
+  localValues.diastolic = dia
+  forceSend()
+}
+
+async function toggleSensors () {
+  const target = !sensorsOn.value
   try {
-    const response = await fetch(
-      `${API_BASE}/api/sessions/${props.session.id}/values`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authStore.authHeader,
-        },
-        body: JSON.stringify(payloadForSend()),
+    const res = await fetch(`${API_BASE}/api/sessions/${props.session.id}/sensors`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authStore.authHeader
       },
-    );
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || "Erreur lors de l'envoi des valeurs");
+      body: JSON.stringify({ sensorsOn: target })
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || 'Impossible de mettre à jour les capteurs')
     }
-    statusMessage.value = "Valeurs transmises";
-    statusType.value = "success";
+    const body = await res.json()
+    // mettre à jour le store avec les dernières valeurs et le flag
+    const v = body.session.lastValues || {}
+    sessionsStore.updateSessionValues(
+      props.session.id,
+      {
+        systolic: v.systolic ?? localValues.systolic,
+        diastolic: v.diastolic ?? localValues.diastolic,
+        heartRate: v.heartRate ?? localValues.heartRate,
+        spo2: v.spo2 ?? localValues.spo2,
+        sensorsOn: v.sensorsOn
+      },
+      new Date().toISOString()
+    )
   } catch (err) {
-    statusMessage.value = err.message;
-    statusType.value = "error";
-  } finally {
-    saving.value = false;
+    statusMessage.value = err.message
+    statusType.value = 'error'
   }
-};
+}
 
-const adjust = (field, step) => {
-  const nextValue = Number(localValues[field]) + step;
-  localValues[field] = Math.round(nextValue);
-  scheduleSend();
-};
+function saveTraineeName () {
+  if (!hasNameChanged.value) return
+  nameSaving.value = true
+  nameFeedback.value = ''
+  fetch(`${API_BASE}/api/sessions/${props.session.id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authStore.authHeader
+    },
+    body: JSON.stringify({ traineeName: traineeDraft.value })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Erreur lors de la sauvegarde')
+      }
+      nameFeedback.value = 'Nom mis à jour.'
+    })
+    .catch(err => {
+      nameFeedback.value = err.message
+    })
+    .finally(() => {
+      nameSaving.value = false
+    })
+}
 
-const onInput = (field, value) => {
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) return;
-  localValues[field] = numeric;
-  scheduleSend();
-};
+function resetName () {
+  traineeDraft.value = props.session.traineeName ?? ''
+  nameFeedback.value = ''
+}
 
-  const formatStep = (step) => (step > 0 ? `+${step}` : `${step}`);
-
-  const rangeClass = (...fields) => {
-    const hasWarning = fields.some((field) => outOfRange[field]);
-    return hasWarning ? "alert" : "";
-  };
-
-  const applyBpPreset = (sys, dia) => {
-    localValues.systolic = sys;
-    localValues.diastolic = dia;
-    forceSend();
-  };
-
-const formatDate = (iso) =>
-  new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
+const formatDate = iso =>
+  new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(iso))
 </script>
 
 <style scoped>
@@ -416,9 +411,36 @@ header h3 {
   font-weight: 600;
 }
 
-header p {
-  margin: 0.25rem 0 0;
-  color: rgba(148, 163, 184, 0.8);
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sensor-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.indicator.online {
+  background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.9);
+}
+
+.indicator.offline {
+  background: #fbbf24;
 }
 
 .trainee-editor {
@@ -435,81 +457,41 @@ header p {
 
 .editor-row {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
   flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .editor-row input {
-  flex: 1 1 220px;
   background: rgba(15, 24, 45, 0.8);
-  border: 1px solid rgba(59, 130, 246, 0.35);
   border-radius: 999px;
-  padding: 0.55rem 1rem;
-  color: #f8fafc;
-}
-
-.editor-row input:focus {
-  outline: 2px solid rgba(59, 130, 246, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  padding: 0.5rem 1rem;
+  color: #e2e8f0;
+  min-width: 220px;
 }
 
 .save {
-  border: none;
   border-radius: 999px;
-  padding: 0.55rem 1.1rem;
+  border: none;
   background: linear-gradient(135deg, #38bdf8, #2563eb);
-  color: white;
+  color: #fff;
+  padding: 0.5rem 1.3rem;
   font-weight: 600;
   cursor: pointer;
 }
 
-.save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.trainee-editor .ghost {
-  border: 1px solid rgba(148, 163, 184, 0.4);
+.ghost {
   border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
   padding: 0.5rem 1.1rem;
   background: transparent;
-  color: rgba(226, 232, 240, 0.85);
+  color: #e2e8f0;
   cursor: pointer;
 }
 
-.trainee-editor .ghost:hover {
-  background: rgba(148, 163, 184, 0.1);
-}
-
 .feedback {
-  margin: 0;
   font-size: 0.85rem;
   color: rgba(96, 165, 250, 0.9);
-}
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  color: rgba(148, 163, 184, 0.8);
-}
-
-.indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-  background: rgba(148, 163, 184, 0.5);
-}
-
-.indicator.online {
-  background: #34d399;
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.8);
-}
-
-.indicator.offline {
-  background: #fbbf24;
 }
 
 .cards {
@@ -637,3 +619,4 @@ input:focus {
   cursor: progress;
 }
 </style>
+

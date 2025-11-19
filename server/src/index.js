@@ -13,6 +13,7 @@ import {
   closeSession,
   findActiveSessionByCode,
   expireSessions,
+  updateSensorsFlag,
 } from "./repositories/sessions.js";
 
 const PORT = process.env.PORT || 4000;
@@ -217,6 +218,37 @@ app.post("/api/public/session-join", async (req, res) => {
       lastValues: session.lastValues,
     },
   });
+});
+
+app.post("/api/sessions/:id/sensors", requireAuth, async (req, res) => {
+  const { sensorsOn } = req.body || {};
+  const result = await updateSensorsFlag({
+    sessionId: req.params.id,
+    trainerId: req.trainerId,
+    sensorsOn: !!sensorsOn,
+  });
+  if (result.status === "not-found") {
+    return res.status(404).json({ error: "Session introuvable" });
+  }
+  if (result.status === "forbidden") {
+    return res.status(403).json({ error: "Accès refusé" });
+  }
+  if (result.status === "closed") {
+    return res.status(409).json({ error: "Session déjà clôturée" });
+  }
+  const v = result.session.lastValues || {};
+  io.to(req.params.id).emit("session-values", {
+    sessionId: req.params.id,
+    ...v,
+    timestamp: new Date().toISOString(),
+    outOfRange: computeOutOfRange({
+      systolic: v.systolic ?? 0,
+      diastolic: v.diastolic ?? 0,
+      heartRate: v.heartRate ?? 0,
+      spo2: v.spo2 ?? 0,
+    }),
+  });
+  res.json({ session: result.session });
 });
 
 io.on("connection", (socket) => {

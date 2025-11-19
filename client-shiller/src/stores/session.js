@@ -99,6 +99,10 @@ export const useSessionStore = defineStore("session", () => {
         diastolic: payload.diastolic,
         heartRate: payload.heartRate,
         spo2: payload.spo2,
+        sensorsOn:
+          payload.sensorsOn ??
+          vitals.value?.sensorsOn ??
+          true,
       };
       outOfRange.value = payload.outOfRange ?? outOfRange.value;
     });

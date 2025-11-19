@@ -66,7 +66,16 @@ export const createSession = async ({
           `INSERT INTO sessions (trainer_id, code, trainee_name, expires_at, last_values)
            VALUES ($1, $2, $3, $4, $5)
            RETURNING *`,
-          [trainerId, code, sanitizedName, expiresAt, defaultValues],
+          [
+            trainerId,
+            code,
+            sanitizedName,
+            expiresAt,
+            {
+              ...defaultValues,
+              sensorsOn: true,
+            },
+          ],
         );
         const sessionRow = rows[0];
         await client.query(
@@ -226,3 +235,33 @@ export const expireSessions = async () => {
   );
   return rows;
 };
+
+export const updateSensorsFlag = async ({ sessionId, trainerId, sensorsOn }) =>
+  withTransaction(async (client) => {
+    const {
+      rows: [sessionRow],
+    } = await client.query(
+      "SELECT * FROM sessions WHERE id = $1 FOR UPDATE",
+      [sessionId],
+    );
+    if (!sessionRow) {
+      return { status: "not-found" };
+    }
+    if (sessionRow.trainer_id !== trainerId) {
+      return { status: "forbidden" };
+    }
+    if (sessionRow.closed_at) {
+      return { status: "closed" };
+    }
+    const nextValues = {
+      ...(sessionRow.last_values || {}),
+      sensorsOn: !!sensorsOn,
+    };
+    const {
+      rows: [updated],
+    } = await client.query(
+      "UPDATE sessions SET last_values = $1 WHERE id = $2 RETURNING *",
+      [nextValues, sessionId],
+    );
+    return { status: "ok", session: mapSessionRow(updated) };
+  });
