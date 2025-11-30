@@ -276,6 +276,9 @@ const bpProgress = ref(0)
 const lastBp = ref({ sys: null, dia: null, map: null })
 const bpBarLevel = ref(0) // 0..1 for bar height
 const bpHistory = ref([]) // last 3 measurements
+// Sound for cuff inflation/deflation
+let cuffOsc
+let cuffGain
 
 // Victim info (local only)
 const patientName = ref('')
@@ -365,6 +368,18 @@ watch(
   { deep: true }
 )
 
+// Restart/stop beep when sensors are toggled
+watch(
+  () => sensorsOn.value,
+  on => {
+    if (on && beepOn.value) {
+      scheduleBeep()
+    } else {
+      stopBeep()
+    }
+  }
+)
+
 function startJitter () {
   const hrAmp = 2
   const spoAmp = 0.5
@@ -406,6 +421,34 @@ function ensureAudio () {
     const Ctx = window.AudioContext || window.webkitAudioContext
     audioCtx = new Ctx()
   }
+}
+
+function startCuffSound () {
+  try {
+    ensureAudio()
+    // stop if already running
+    stopCuffSound()
+    cuffOsc = audioCtx.createOscillator()
+    cuffGain = audioCtx.createGain()
+    cuffOsc.type = 'sawtooth'
+    cuffOsc.frequency.value = 160 // low hum like a pump
+    cuffGain.gain.value = 0.00005
+    cuffOsc.connect(cuffGain).connect(audioCtx.destination)
+    cuffOsc.start()
+    // fade in a bit
+    cuffGain.gain.exponentialRampToValueAtTime(0.04, audioCtx.currentTime + 0.2)
+  } catch {}
+}
+
+function stopCuffSound () {
+  try {
+    if (cuffGain && cuffOsc) {
+      cuffGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1)
+      cuffOsc.stop(audioCtx.currentTime + 0.12)
+    }
+  } catch {}
+  cuffOsc = null
+  cuffGain = null
 }
 
 function playBeep () {
@@ -471,6 +514,7 @@ function startBpMeasurement () {
   bpMeasuring.value = true
   bpProgress.value = 0
   bpBarLevel.value = 0
+  startCuffSound()
 
   const start = Date.now()
   const total = 15000 // ~15 s, slower like a real cuff
@@ -501,6 +545,7 @@ function startBpMeasurement () {
       if (sys != null) {
         bpBarLevel.value = Math.max(0, Math.min(1, sys / 160))
       }
+      stopCuffSound()
 
       // Add to history (last 3)
       const time = new Intl.DateTimeFormat('fr-FR', {
