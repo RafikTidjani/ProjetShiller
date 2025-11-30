@@ -1,12 +1,12 @@
 <template>
   <div class="monitor-shell">
-    <!-- Top white frame SCHILLER / Touch 7 -->
+    <!-- Cadre blanc haut -->
     <div class="frame-top">
       <span class="frame-brand">SCHILLER</span>
       <span class="frame-model">Touch 7</span>
     </div>
 
-    <!-- Black top bar inside the screen -->
+    <!-- Ecran noir haut -->
     <header class="monitor-top">
       <div class="top-left">
         <span class="top-icon">☀</span>
@@ -26,8 +26,17 @@
       </div>
     </header>
 
-    <!-- Session info -->
-    <section class="monitor-meta" v-if="sessionStore.session">
+    <!-- Ecran d'attente -->
+    <div v-if="!poweredOn" class="standby">
+      <div class="standby-inner">
+        <div class="standby-logo">SCHILLER</div>
+        <button class="power-btn" @click="powerOn">Allumer</button>
+        <p class="standby-hint">Appuyez sur Allumer pour démarrer</p>
+      </div>
+    </div>
+
+    <!-- Infos session -->
+    <section class="monitor-meta" v-if="sessionStore.session && poweredOn">
       <div class="meta-item">
         <span class="meta-label">Code</span>
         <strong>{{ sessionStore.session.code }}</strong>
@@ -42,9 +51,9 @@
       </div>
     </section>
 
-    <!-- Main screen grid -->
-    <main class="monitor-grid" v-if="sessionStore.session">
-      <!-- Big pulse area on the left -->
+    <!-- Grille principale -->
+    <main class="monitor-grid" v-if="sessionStore.session && poweredOn">
+      <!-- Pouls -->
       <section
         class="tile tile--pulse"
         :class="{ 'tile--alert': sessionStore.outOfRange.heartRate }"
@@ -53,13 +62,10 @@
           <span>Pouls</span>
           <span>b/min</span>
         </header>
-
-        <!-- Vertical scale 120 / 50 -->
         <div class="axis axis--pulse">
           <span>120</span>
           <span>50</span>
         </div>
-
         <div class="tile__value tile__value--xl">
           <span class="tile__value-main">
             {{ hrSensorOn ? displayValue(displayHeartRate) : '--' }}
@@ -68,7 +74,7 @@
         </div>
       </section>
 
-      <!-- Right column SpO2 / Pulse -->
+      <!-- SpO2 -->
       <section
         class="tile tile--spo2"
         :class="{ 'tile--alert': sessionStore.outOfRange.spo2 }"
@@ -77,14 +83,11 @@
           <span>SpO2</span>
           <span>%</span>
         </header>
-
-        <!-- Scale 100 / 92 / 50 -->
         <div class="axis axis--spo2">
           <span>100</span>
           <span>92</span>
           <span>50</span>
         </div>
-
         <div class="tile__value tile__value--lg">
           <span class="tile__value-main">
             {{ satSensorOn ? displayValue(displaySpo2) : '--' }}
@@ -97,7 +100,7 @@
         </footer>
       </section>
 
-      <!-- PNI bottom left -->
+      <!-- PNI -->
       <section
         class="tile tile--bp"
         :class="{
@@ -110,14 +113,11 @@
           <span>mmHg</span>
         </header>
 
-        <!-- Main PNI block: values, dynamic bar, history -->
         <div class="bp-main">
-          <!-- Overlay during measurement -->
           <div v-if="bpMeasuring" class="bp-overlay">
             <div class="cuff">PNI</div>
           </div>
 
-          <!-- Left column: scale and numeric values -->
           <div class="bp-left">
             <div class="bp-scale">
               <span>160</span>
@@ -146,7 +146,6 @@
             </div>
           </div>
 
-          <!-- Center column: vertical mmHg bar -->
           <div class="bp-bar-block">
             <div class="bp-bar">
               <div
@@ -160,7 +159,6 @@
             </span>
           </div>
 
-          <!-- Right column: last 3 measurements history -->
           <div class="bp-history">
             <div class="bp-history-title">SYS/DIA (MAP)</div>
             <div
@@ -181,7 +179,7 @@
         </footer>
       </section>
 
-      <!-- Victim info where Temp is on the real device -->
+      <!-- Infos victime -->
       <section class="tile tile--info">
         <header class="tile__header">
           <span>Infos victime</span>
@@ -204,8 +202,8 @@
       </section>
     </main>
 
-    <!-- Bottom blue menu bar -->
-    <section class="monitor-menu">
+    <!-- Barre de menu -->
+    <section class="monitor-menu" v-if="poweredOn">
       <button class="menu-btn">
         <span class="menu-icon">↺</span>
         <span class="menu-label">ECG 12D</span>
@@ -232,8 +230,7 @@
       </button>
     </section>
 
-    <!-- Device bottom bar -->
-    <footer class="monitor-bottom">
+    <footer class="monitor-bottom" v-if="poweredOn">
       <span>DEFIGARD</span>
       <button class="mini-btn" @click="toggleBeep">
         Bip : {{ beepOn ? 'ON' : 'OFF' }}
@@ -254,33 +251,29 @@ const today = ref('')
 const now = ref('')
 let clockTimer
 
-// Sensors (controlled by admin)
+const poweredOn = ref(false)
+
 const sensorsOn = computed(() => sessionStore.vitals?.sensorsOn ?? true)
 const hrSensorOn = computed(() => sensorsOn.value)
 const satSensorOn = computed(() => sensorsOn.value)
 
-// Jitter around target values
 const displayHeartRate = ref(null)
 const displaySpo2 = ref(null)
 let jitterTimer
 
-// Beep
 const beepOn = ref(true)
 let audioCtx
 let beepTimeout
 
-// Blood pressure
 const bpMeasuring = ref(false)
 const bpMeasured = ref(false)
 const bpProgress = ref(0)
 const lastBp = ref({ sys: null, dia: null, map: null })
-const bpBarLevel = ref(0) // 0..1 for bar height
-const bpHistory = ref([]) // last 3 measurements
-// Sound for cuff inflation/deflation
+const bpBarLevel = ref(0)
+const bpHistory = ref([])
 let cuffOsc
 let cuffGain
 
-// Victim info (local only)
 const patientName = ref('')
 const patientAge = ref('')
 const patientNotes = ref('')
@@ -308,33 +301,22 @@ function updateClock () {
 
 const displayValue = v => (v === null || v === undefined ? '--' : v)
 
+function powerOn () {
+  poweredOn.value = true
+  scheduleBeep()
+}
+
 onMounted(() => {
   updateClock()
   clockTimer = setInterval(updateClock, 30_000)
   startJitter()
 
-  // Try to enable beep early (some browsers require interaction)
   try {
     ensureAudio()
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume()
     }
-    scheduleBeep()
   } catch {}
-
-  const resume = async () => {
-    try {
-      if (audioCtx && audioCtx.state === 'suspended') {
-        await audioCtx.resume()
-      }
-      scheduleBeep()
-    } catch {}
-    window.removeEventListener('pointerdown', resume)
-    window.removeEventListener('keydown', resume)
-  }
-
-  window.addEventListener('pointerdown', resume, { once: true })
-  window.addEventListener('keydown', resume, { once: true })
 })
 
 onUnmounted(() => {
@@ -343,7 +325,6 @@ onUnmounted(() => {
   stopBeep()
 })
 
-// If session expires, go to ended screen
 watch(
   () => sessionStore.expired,
   v => {
@@ -351,7 +332,6 @@ watch(
   }
 )
 
-// When backend sends new vitals
 watch(
   () => sessionStore.vitals,
   v => {
@@ -368,11 +348,10 @@ watch(
   { deep: true }
 )
 
-// Restart/stop beep when sensors are toggled
 watch(
   () => sensorsOn.value,
   on => {
-    if (on && beepOn.value) {
+    if (on && beepOn.value && poweredOn.value) {
       scheduleBeep()
     } else {
       stopBeep()
@@ -426,16 +405,14 @@ function ensureAudio () {
 function startCuffSound () {
   try {
     ensureAudio()
-    // stop if already running
     stopCuffSound()
     cuffOsc = audioCtx.createOscillator()
     cuffGain = audioCtx.createGain()
     cuffOsc.type = 'sawtooth'
-    cuffOsc.frequency.value = 160 // low hum like a pump
+    cuffOsc.frequency.value = 160
     cuffGain.gain.value = 0.00005
     cuffOsc.connect(cuffGain).connect(audioCtx.destination)
     cuffOsc.start()
-    // fade in a bit
     cuffGain.gain.exponentialRampToValueAtTime(0.04, audioCtx.currentTime + 0.2)
   } catch {}
 }
@@ -456,7 +433,7 @@ function playBeep () {
     ensureAudio()
     const v = sessionStore.vitals || {}
     const baseHr = Math.max(0, v.heartRate ?? 60)
-    if (!hrSensorOn.value || baseHr <= 0) return
+    if (!hrSensorOn.value || baseHr <= 0 || !poweredOn.value) return
 
     const osc = audioCtx.createOscillator()
     const gain = audioCtx.createGain()
@@ -478,7 +455,7 @@ function playBeep () {
 }
 
 function scheduleBeep () {
-  if (!beepOn.value) return
+  if (!beepOn.value || !poweredOn.value) return
   if (beepTimeout) clearTimeout(beepTimeout)
   const v = sessionStore.vitals || {}
   const baseHr = Math.max(0, v.heartRate ?? 60)
@@ -500,7 +477,7 @@ function stopBeep () {
 
 function toggleBeep () {
   beepOn.value = !beepOn.value
-  if (beepOn.value) {
+  if (beepOn.value && poweredOn.value) {
     ensureAudio()
     scheduleBeep()
   } else {
@@ -509,6 +486,7 @@ function toggleBeep () {
 }
 
 function startBpMeasurement () {
+  if (!poweredOn.value) return
   if (bpMeasuring.value) return
   bpMeasured.value = false
   bpMeasuring.value = true
@@ -517,14 +495,13 @@ function startBpMeasurement () {
   startCuffSound()
 
   const start = Date.now()
-  const total = 15000 // ~15 s, slower like a real cuff
+  const total = 15000
 
   const id = setInterval(() => {
     const elapsed = Date.now() - start
     const progress = Math.min(1, elapsed / total)
     bpProgress.value = progress * 100
 
-    // During measurement, animate the bar up then slightly down
     const phase = progress < 0.5 ? progress * 2 : (1 - progress) * 2
     bpBarLevel.value = Math.max(0, Math.min(1, phase))
 
@@ -541,13 +518,11 @@ function startBpMeasurement () {
         sys != null && dia != null ? Math.round((dia * 2 + sys) / 3) : null
       lastBp.value = { sys, dia, map }
 
-      // Set final bar level based on SYS
       if (sys != null) {
         bpBarLevel.value = Math.max(0, Math.min(1, sys / 160))
       }
       stopCuffSound()
 
-      // Add to history (last 3)
       const time = new Intl.DateTimeFormat('fr-FR', {
         hour: '2-digit',
         minute: '2-digit'
@@ -568,7 +543,6 @@ function restartBp () {
   startBpMeasurement()
 }
 
-// If vitals change, next measurement will pick new tension values
 watch(
   () => sessionStore.vitals,
   () => {},
@@ -656,6 +630,42 @@ watch(
   color: #111827;
   border-radius: 4px;
   padding: 0 0.2rem;
+}
+
+.standby {
+  display: grid;
+  place-items: center;
+  background: #050a24;
+  border-radius: 6px;
+  padding: 2rem;
+  min-height: 400px;
+}
+
+.standby-inner {
+  display: grid;
+  gap: 1rem;
+  place-items: center;
+  color: #e5edf8;
+}
+
+.standby-logo {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.power-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.8rem 2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.standby-hint {
+  opacity: 0.85;
 }
 
 .monitor-meta {
@@ -796,7 +806,6 @@ watch(
   color: rgba(15, 23, 42, 0.9);
 }
 
-/* PNI layout */
 .bp-main {
   position: relative;
   display: grid;
@@ -818,7 +827,6 @@ watch(
   color: #e5e7eb;
 }
 
-/* Arrange SYS / DIA / MAP like on the real PNI: SYS top-left, DIA top-right, MAP bottom-left */
 .bp-values {
   display: grid;
   grid-template-columns: auto auto;
@@ -1002,6 +1010,22 @@ watch(
   color: #e5e7eb;
   font-size: 0.78rem;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.menu-btn--primary {
+  font-weight: 700;
+}
+
+.menu-icon {
+  font-size: 1.2rem;
+}
+
+.menu-label {
+  font-size: 0.75rem;
 }
 
 .monitor-bottom {
@@ -1027,3 +1051,4 @@ watch(
   }
 }
 </style>
+
